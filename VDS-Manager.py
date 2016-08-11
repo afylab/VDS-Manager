@@ -31,11 +31,11 @@ class interface(gui.QMainWindow):
 		self.show()
 
 	def closeEvent(self,event):
-        print("Stopping LabRAD connection...")
-        self.connection.disconnect()
-        print("LabRAD connection stopped.")
+		print("Stopping LabRAD connection...")
+		self.connection.disconnect()
+		print("LabRAD connection stopped.")
 
 if __name__=='__main__':
-    app = gui.QApplication(sys.argv)
-    i = interface()
-    sys.exit(app.exec_())
+	app = gui.QApplication(sys.argv)
+	i = interface()
+	sys.exit(app.exec_())
