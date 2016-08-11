@@ -1,9 +1,9 @@
 from PyQt4 import QtCore as core, QtGui as gui
 import sys,math,time
 
-from components.channel_viewer import ChannelModificationControlWidget
+from components.channel_viewer import MainInterface
 
-class interface(gui.QWidget):
+class interface(gui.QMainWindow):
 
 	def __init__(self):
 		super(interface,self).__init__()
@@ -26,13 +26,8 @@ class interface(gui.QWidget):
 		self.connected  = True
 
 	def doUI(self):
-		# testing components
-		self.cc = ChannelModificationControlWidget(self)
-		self.VBoxMain = gui.QVBoxLayout()
-		self.VBoxMain.addWidget(self.cc)
-		self.setLayout(self.VBoxMain)
-
-
+		self.main=MainInterface(self,self.connection)
+		self.setCentralWidget(self.main)
 		self.show()
 
 if __name__=='__main__':
