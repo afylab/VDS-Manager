@@ -316,8 +316,8 @@ class ChannelDeviceInfoWidget(gui.QWidget):
 		self.input_max.setText("")
 		self.input_offset.setText("")
 		self.input_scale.setText("")
-		self.ChannelGetInfoWidget.clear_fields()
-		self.ChannelSetInfoWidget.clear_fields()
+		self.tab_get.clear_fields()
+		self.tab_set.clear_fields()
 
 
 class ChannelGetInfoWidget(gui.QWidget):
@@ -362,6 +362,33 @@ class ChannelGetInfoWidget(gui.QWidget):
 		self.VBoxMain.addLayout(self.VBoxInputsList,1)
 		self.setLayout(self.VBoxMain)
 
+		self.button_add_input.clicked.connect(self.add_input)
+		self.input_value.returnPressed.connect(self.add_input)
+		self.input_units.returnPressed.connect(self.add_input)
+		self.button_del_input.clicked.connect(self.del_input)
+		self.button_clear_inputs.clicked.connect(self.clear_inputs)
+
+	def add_input(self):
+		value = str(self.input_value.text())
+		units = str(self.input_units.text())
+		if len(value) and len(units):
+			self.inputs.append([value,units])
+			self.list_inputs.addItem("{value} ({units})".format(value=value,units=units))
+			self.input_value.setText("")
+			self.input_units.setText("")
+
+	def del_input(self):
+		row = self.list_inputs.currentRow()
+		if row >= 0:
+			self.list_inputs.takeItem(row)
+			del self.inputs[row]
+
+	def clear_inputs(self):
+		if self.cb_clear_inputs.isChecked():
+			self.list_inputs.clear()
+			self.inputs = []
+			self.cb_clear_inputs.setChecked(False)
+
 	def set_editing_mode(self,mode):
 		if not (mode in ['viewing','editing','creating']):
 			return
@@ -386,7 +413,6 @@ class ChannelGetInfoWidget(gui.QWidget):
 			self.inputs.append([channel.get_inputs[inp],channel.get_inputs_units[inp]])
 			self.list_inputs.addItem("{input} ({units})".format(input=channel.get_inputs[inp],units=channel.get_inputs_units[inp]))
 
-
 	def clear_fields(self):
 		self.inputs = []
 		self.list_inputs.clear()
@@ -397,18 +423,131 @@ class ChannelGetInfoWidget(gui.QWidget):
 		self.input_units.setText('')
 		self.cb_clear_inputs.setChecked(False)
 
+
 class ChannelSetInfoWidget(gui.QWidget):
 	def __init__(self,parent):
 		super(ChannelSetInfoWidget,self).__init__(parent)
+		self.label_server  = gui.QLineEdit("server",self) ; self.label_server.setReadOnly(True)
+		self.label_device  = gui.QLineEdit("device",self) ; self.label_device.setReadOnly(True)
+		self.label_setting = gui.QLineEdit("setting",self); self.label_setting.setReadOnly(True)
+		self.input_server  = gui.QLineEdit(self)
+		self.input_device  = gui.QLineEdit(self)
+		self.input_setting = gui.QLineEdit(self)
+
+		self.label_var_slot  = gui.QLineEdit("variable slot",self) ; self.label_var_slot.setReadOnly(True)
+		self.label_var_units = gui.QLineEdit("variable units",self); self.label_var_units.setReadOnly(True)
+		self.input_var_slot  = gui.QLineEdit(self)
+		self.input_var_units = gui.QLineEdit(self)
+
+		self.inputs = [] # list of [ [value, units], ... ]
+		self.label_inputs     = gui.QLineEdit("inputs",self); self.label_inputs.setReadOnly(True)
+		self.input_value      = gui.QLineEdit(self); self.input_value.setPlaceholderText("value")
+		self.input_units      = gui.QLineEdit(self); self.input_units.setPlaceholderText("units")
+		self.button_add_input = gui.QPushButton("add",self)
+		self.list_inputs      = gui.QListWidget(self)
+		self.button_del_input    = gui.QPushButton("delete",self)
+		self.button_clear_inputs = gui.QPushButton("clear",self)
+		self.cb_clear_inputs     = gui.QCheckBox("confirm clear",self)
+
+		self.VBoxLabels = gui.QVBoxLayout(); self.VBoxLabels.setSpacing(0)
+		self.VBoxInputs = gui.QVBoxLayout(); self.VBoxInputs.setSpacing(0)
+		self.HBoxTop    = gui.QHBoxLayout(); self.HBoxTop.setSpacing(0)
+		self.VBoxLabels.addWidget(self.label_server);self.VBoxLabels.addWidget(self.label_device);self.VBoxLabels.addWidget(self.label_setting)
+		self.VBoxInputs.addWidget(self.input_server);self.VBoxInputs.addWidget(self.input_device);self.VBoxInputs.addWidget(self.input_setting)
+		self.HBoxTop.addLayout(self.VBoxLabels,1);self.HBoxTop.addLayout(self.VBoxInputs,4)
+
+		self.VBoxVarLabels = gui.QVBoxLayout();self.VBoxVarLabels.setSpacing(0)
+		self.VBoxVarInputs = gui.QVBoxLayout();self.VBoxVarInputs.setSpacing(0)
+		self.HBoxVar       = gui.QHBoxLayout();self.HBoxVar.setSpacing(0)
+		self.VBoxVarLabels.addWidget(self.label_var_slot);self.VBoxVarLabels.addWidget(self.label_var_units)
+		self.VBoxVarInputs.addWidget(self.input_var_slot);self.VBoxVarInputs.addWidget(self.input_var_units)
+		self.HBoxVar.addLayout(self.VBoxVarLabels);self.HBoxVar.addLayout(self.VBoxVarInputs)
+
+		self.HBoxInputsListTop = gui.QHBoxLayout(); self.HBoxInputsListTop.setSpacing(0)
+		self.HBoxInptusListBot = gui.QHBoxLayout(); self.HBoxInptusListBot.setSpacing(0)
+		self.VBoxInputsList    = gui.QVBoxLayout(); self.VBoxInputsList.setSpacing(0)
+		self.HBoxInputsListTop.addWidget(self.label_inputs,1);self.HBoxInputsListTop.addWidget(self.input_value,2);self.HBoxInputsListTop.addWidget(self.input_units,1);self.HBoxInputsListTop.addWidget(self.button_add_input,1)
+		self.HBoxInptusListBot.addWidget(self.button_del_input);self.HBoxInptusListBot.addWidget(self.button_clear_inputs);self.HBoxInptusListBot.addWidget(self.cb_clear_inputs)
+		self.VBoxInputsList.addLayout(self.HBoxInputsListTop,0)
+		self.VBoxInputsList.addWidget(self.list_inputs,1)
+		self.VBoxInputsList.addLayout(self.HBoxInptusListBot,0)
+
+		self.VBoxMain = gui.QVBoxLayout()
+		self.VBoxMain.addLayout(self.HBoxTop,0)
+		self.VBoxMain.addLayout(self.HBoxVar,0)
+		self.VBoxMain.addLayout(self.VBoxInputsList,1)
+		self.setLayout(self.VBoxMain)
+		self.set_editing_mode('viewing')
+
+		self.button_add_input.clicked.connect(self.add_input)
+		self.input_value.returnPressed.connect(self.add_input)
+		self.input_units.returnPressed.connect(self.add_input)
+		self.button_del_input.clicked.connect(self.del_input)
+		self.button_clear_inputs.clicked.connect(self.clear_inputs)
+
+	def add_input(self):
+		value = str(self.input_value.text())
+		units = str(self.input_units.text())
+		if len(value) and len(units):
+			self.inputs.append([value,units])
+			self.list_inputs.addItem("{value} ({units})".format(value=value,units=units))
+			self.input_value.setText("")
+			self.input_units.setText("")
+
+	def del_input(self):
+		row = self.list_inputs.currentRow()
+		if row >= 0:
+			self.list_inputs.takeItem(row)
+			del self.inputs[row]
+
+	def clear_inputs(self):
+		if self.cb_clear_inputs.isChecked():
+			self.list_inputs.clear()
+			self.inputs = []
+			self.cb_clear_inputs.setChecked(False)
 
 	def set_editing_mode(self,mode):
-		pass
+		if not (mode in ['viewing','editing','creating']):
+			return
+
+		self.input_server.setReadOnly(mode == 'viewing')
+		self.input_device.setReadOnly(mode == 'viewing')
+		self.input_setting.setReadOnly(mode == 'viewing')
+		self.input_value.setReadOnly(mode == 'viewing')
+		self.input_units.setReadOnly(mode == 'viewing')
+		self.input_var_slot.setReadOnly(mode == 'viewing')
+		self.input_var_units.setReadOnly(mode == 'viewing')
+
+		self.button_add_input.setEnabled(mode != 'viewing')
+		self.button_del_input.setEnabled(mode != 'viewing')
+		self.button_clear_inputs.setEnabled(mode != 'viewing')
+		self.cb_clear_inputs.setEnabled(mode != 'viewing')
+
 
 	def load_channel(self,channel):
-		pass
+		self.clear_fields()
+		self.input_server.setText(channel.set_setting[0])
+		self.input_device.setText(channel.set_setting[1])
+		self.input_setting.setText(channel.set_setting[2])
+		self.input_var_slot.setText(str(channel.set_var_slot))
+		self.input_var_units.setText(str(channel.set_var_units))
+		
+		for inp in range(len(channel.set_statics)):
+			self.inputs.append([channel.set_statics[inp],channel.set_statics_units[inp]])
+			self.list_inputs.addItem("{input} ({units})".format(input=channel.set_statics[inp],units=channel.set_statics_units[inp]))
+
 
 	def clear_fields(self):
-		pass
+		self.inputs = []
+		self.list_inputs.clear()
+		self.input_server.setText('')
+		self.input_device.setText('')
+		self.input_setting.setText('')
+		self.input_value.setText('')
+		self.input_units.setText('')
+		self.input_var_slot.setText('')
+		self.input_var_units.setText('')
+		self.cb_clear_inputs.setChecked(False)
 
 class ChannelModificationControlWidget(gui.QWidget):
 	def __init__(self,parent):
@@ -458,8 +597,6 @@ class ChannelModificationControlWidget(gui.QWidget):
 		self.cb_confirm_save.setEnabled(     mode != 'viewing' )
 		self.cb_confirm_discard.setEnabled(  mode != 'viewing' )
 
-
-
 class MainInterface(gui.QWidget):
 	def __init__(self,parent,connection):
 		super(MainInterface,self).__init__(parent)
@@ -487,6 +624,8 @@ class MainInterface(gui.QWidget):
 		self.controls.button_edit_channel.clicked.connect(self.start_editing_channel)
 		self.controls.button_new_channel.clicked.connect(self.start_new_channel)
 
+		self.controls.button_discard.clicked.connect(self.discard_changes)
+
 
 	def load_channel(self,channel):
 		"""Called upon activating an item in the channel list. Sends the channel to each component."""
@@ -498,10 +637,11 @@ class MainInterface(gui.QWidget):
 			# Note that mode is not changed by loading a channel
 
 	def start_new_channel(self):
-		if self.mode == 'viewing':
-			self.channel_descripive.new_channel()
-			self.channel_device.new_channel()
-			self.change_mode('creating')
+		pass
+		# if self.mode == 'viewing':
+		# 	self.channel_descripive.new_channel()
+		# 	self.channel_device.new_channel()
+		# 	self.change_mode('creating')
 
 	def start_editing_channel(self):
 		if self.mode == 'viewing':
@@ -516,3 +656,11 @@ class MainInterface(gui.QWidget):
 		self.channel_descripive.set_editing_mode(mode)
 		self.channel_device.set_editing_mode(mode)
 		self.controls.set_editing_mode(mode)
+
+	def discard_changes(self):
+		if self.controls.cb_confirm_discard.isChecked():
+			self.channel = None
+			self.change_mode('viewing')
+			self.channel_descripive.clear_fields()
+			self.channel_device.clear_fields()
+			self.controls.cb_confirm_discard.setChecked(False)
