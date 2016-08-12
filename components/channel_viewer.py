@@ -61,7 +61,9 @@ class ChannelSelectorWidget(gui.QWidget):
 
 		self.VBoxName = gui.QVBoxLayout();self.VBoxName.setSpacing(0)
 		self.VBoxID   = gui.QVBoxLayout();self.VBoxID.setSpacing(0)
+		self.HBoxDel  = gui.QHBoxLayout();self.HBoxDel.setSpacing(0)
 		self.HBoxMain = gui.QHBoxLayout();self.HBoxMain.setSpacing(0)
+		self.VBoxMain = gui.QVBoxLayout();self.VBoxMain.setSpacing(0)
 
 		self.ch_name = gui.QListWidget(self)
 		self.ch_id   = gui.QListWidget(self)
@@ -75,14 +77,26 @@ class ChannelSelectorWidget(gui.QWidget):
 		self.label_name    = gui.QLineEdit("name",self); self.label_name.setReadOnly(True)
 		self.label_id      = gui.QLineEdit("ID",self)  ; self.label_id.setReadOnly(True)
 
+		self.button_del_channel = gui.QPushButton("delete",self)
+		self.cb_del_channel     = gui.QCheckBox("confirm delete",self)
+		self.label_del_channel  = gui.QLineEdit(self)
+		self.ch_name.currentRowChanged.connect(self.update_del_text)
+		self.ch_id.currentRowChanged.connect(self.update_del_text)
+
+
 		self.VBoxName.addWidget(self.label_name)
 		self.VBoxName.addWidget(self.ch_name)
 		self.VBoxID.addWidget(self.label_id)
 		self.VBoxID.addWidget(self.ch_id)
 		self.HBoxMain.addLayout(self.VBoxName, 4)
 		self.HBoxMain.addLayout(self.VBoxID  , 1)
+		self.HBoxDel.addWidget(self.button_del_channel,0)
+		self.HBoxDel.addWidget(self.cb_del_channel,1)
+		self.VBoxMain.addLayout(self.HBoxMain,1)
+		self.VBoxMain.addLayout(self.HBoxDel,0)
+		self.VBoxMain.addWidget(self.label_del_channel,0)
 
-		self.setLayout(self.HBoxMain)
+		self.setLayout(self.VBoxMain)
 		self.populate()
 
 	def populate(self):
@@ -93,15 +107,24 @@ class ChannelSelectorWidget(gui.QWidget):
 		for channel in self.channels:
 			self.ch_name.addItem(channel[1])
 			self.ch_id.addItem(channel[0])
+		self.ch_name.setCurrentRow(0)
 
 	def set_editing_mode(self,mode):
 		if mode not in ['viewing','editing','creating']:
 			return
 		self.set_enabled(mode == 'viewing')
+		self.button_del_channel.setEnabled(mode=='viewing')
+		self.cb_del_channel.setEnabled(mode=='viewing')
+		self.cb_del_channel.setChecked(False)
 
 	def set_enabled(self,is_enabled):
 		self.ch_name.setEnabled(is_enabled)
 		self.ch_id.setEnabled(is_enabled)
+
+	def update_del_text(self):
+		row = self.ch_name.currentRow()
+		ID,name = self.channels[row]
+		self.label_del_channel.setText("ID={ID}, name={name}".format(ID=ID,name=name))
 
 
 class ChannelDescriptiveInfoWidget(gui.QWidget):
@@ -620,6 +643,7 @@ class MainInterface(gui.QWidget):
 
 		self.channel_selector.ch_name.itemActivated.connect(self.load_channel)
 		self.channel_selector.ch_id.itemActivated.connect(self.load_channel)
+		self.channel_selector.button_del_channel.clicked.connect(self.del_channel)
 
 		self.controls.button_edit_channel.clicked.connect(self.start_editing_channel)
 		self.controls.button_new_channel.clicked.connect(self.start_new_channel)
@@ -632,6 +656,19 @@ class MainInterface(gui.QWidget):
 		self.controls.cb_confirm_save.setChecked(False)
 		self.load_channel(force_id=True,ID=self.channel.ID)
 		self.channel_selector.populate()
+
+	def del_channel(self):
+		if self.mode == 'viewing':
+			ID,name = self.channel_selector.channels[self.channel_selector.ch_name.currentRow()]
+			
+			if ID == self.channel.ID:
+				self.channel_descripive.clear_fields(); self.channel_descripive.channel = None
+				self.channel_device.clear_fields()    ; self.channel_descripive.channel = None
+				self.channel = None
+
+			self.vds.reg_del_channel(ID)
+			self.channel_selector.populate()
+			self.channel_selector.cb_del_channel.setChecked(False)
 
 	def load_channel(self,force_id=False,ID=None):
 		"""Called upon activating an item in the channel list. Sends the channel to each component."""
@@ -667,8 +704,17 @@ class MainInterface(gui.QWidget):
 
 	def discard_changes(self):
 		if self.controls.cb_confirm_discard.isChecked():
+			oldmode = str(self.mode)
 			self.change_mode('viewing')
-			self.reload_channel()
+			if oldmode == 'editing':
+				self.reload_channel()
+			else:
+				self.channel_descripive.clear_fields(); self.channel_descripive.channel = None
+				self.channel_device.clear_fields()    ; self.channel_descripive.channel = None
+				self.channel = None
+				self.controls.cb_confirm_save.setChecked(False)
+				self.controls.cb_confirm_discard.setChecked(False)
+
 
 	def save_changes(self):
 		if not (self.controls.cb_confirm_save.isChecked()):
