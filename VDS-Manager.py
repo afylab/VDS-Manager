@@ -1,14 +1,11 @@
 from PyQt4 import QtCore as core, QtGui as gui
-import sys,math,time
-
+import sys
 from components.channel_viewer import MainInterface
 
 class interface(gui.QMainWindow):
-
 	def __init__(self):
 		super(interface,self).__init__()
 		self.setWindowTitle("VDS Manager")
-
 		self.connected  = False
 		self.connect()
 

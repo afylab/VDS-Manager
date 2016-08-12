@@ -8,5 +8,7 @@ Cannot yet save modifications
 - [x] Loads all channels from VDS
 - [x] Can view channels and channel details
 - [x] Can modify channel details in "editing mode"
-- [ ] Can save changes through VDS
-- [ ] Can create new channels through VDS
+- [x] Can save changes through VDS
+- [x] Can create new channels through VDS
+- [ ] Can delete channels through VDS
+- [ ] Easier server/device/setting selection (ability to choose values from active servers & devices)

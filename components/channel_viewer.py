@@ -31,24 +31,24 @@ class ChannelInstance(object):
 			self.name        = name
 			self.label       = label
 			self.description = description
-			self.tags        = tags
+			self.tags        = [tag for tag in tags]
 			
 			self.has_get = has_get
 			self.has_set = has_set
 
-			self.get_setting      = get_setting
-			self.get_inputs       = get_inputs
-			self.get_inputs_units = get_inputs_units
+			self.get_setting      = [setting  for setting in get_setting     ]
+			self.get_inputs       = [str(inp) for inp     in get_inputs      ]
+			self.get_inputs_units = [units    for units   in get_inputs_units]
 
-			self.set_setting       = set_setting
+			self.set_setting       = [setting for setting in set_setting]
 			self.set_var_slot      = set_var_slot
 			self.set_var_units     = set_var_units
-			self.set_statics       = set_statics
-			self.set_statics_units = set_statics_units
-			self.set_min           = set_min
-			self.set_max           = set_max
-			self.set_offset        = set_offset
-			self.set_scale         = set_scale
+			self.set_statics       = [inp for inp in set_statics]
+			self.set_statics_units = [str(inp) for inp in set_statics_units]
+			self.set_min           = float(set_min)
+			self.set_max           = float(set_max)
+			self.set_offset        = float(set_offset)
+			self.set_scale         = float(set_scale)
 
 #########################
 ## INTERFACE / WIDGETS ##
@@ -625,23 +625,31 @@ class MainInterface(gui.QWidget):
 		self.controls.button_new_channel.clicked.connect(self.start_new_channel)
 
 		self.controls.button_discard.clicked.connect(self.discard_changes)
+		self.controls.button_save.clicked.connect(self.save_changes)
 
+	def reload_channel(self):
+		self.controls.cb_confirm_discard.setChecked(False)
+		self.controls.cb_confirm_save.setChecked(False)
+		self.load_channel(force_id=True,ID=self.channel.ID)
+		self.channel_selector.populate()
 
-	def load_channel(self,channel):
+	def load_channel(self,force_id=False,ID=None):
 		"""Called upon activating an item in the channel list. Sends the channel to each component."""
 		if self.mode == 'viewing':
-			ID      = self.channel_selector.channels[self.channel_selector.ch_name.currentRow()][0]
+			if force_id is True and not (ID is None):
+				ID = ID
+			else:
+				ID = self.channel_selector.channels[self.channel_selector.ch_name.currentRow()][0]
 			self.channel = ChannelInstance(*self.vds.list_channel_details(ID))
 			self.channel_descripive.load_channel(self.channel)
 			self.channel_device.load_channel(self.channel)
 			# Note that mode is not changed by loading a channel
 
 	def start_new_channel(self):
-		pass
-		# if self.mode == 'viewing':
-		# 	self.channel_descripive.new_channel()
-		# 	self.channel_device.new_channel()
-		# 	self.change_mode('creating')
+		if self.mode == 'viewing':
+			self.channel_descripive.new_channel()
+			self.channel_device.new_channel()
+			self.change_mode('creating')
 
 	def start_editing_channel(self):
 		if self.mode == 'viewing':
@@ -659,8 +667,114 @@ class MainInterface(gui.QWidget):
 
 	def discard_changes(self):
 		if self.controls.cb_confirm_discard.isChecked():
-			self.channel = None
 			self.change_mode('viewing')
-			self.channel_descripive.clear_fields()
-			self.channel_device.clear_fields()
+			self.reload_channel()
+
+	def save_changes(self):
+		if not (self.controls.cb_confirm_save.isChecked()):
+			return
+
+		# Get info for potential modifications
+		name        = str(self.channel_descripive.input_name.text())
+		ID          = str(self.channel_descripive.input_id.text())
+		label       = str(self.channel_descripive.input_label.text())
+		description = str(self.channel_descripive.input_description.toPlainText())
+		tags        = [str(self.channel_descripive.list_tags.item(n).text()) for n in range(self.channel_descripive.list_tags.count())]
+
+		has_get = self.channel_device.cb_has_get.isChecked()
+		has_set = self.channel_device.cb_has_set.isChecked()
+		set_min    = str(self.channel_device.input_min.text())
+		set_max    = str(self.channel_device.input_max.text())
+		set_offset = str(self.channel_device.input_offset.text())
+		set_scale  = str(self.channel_device.input_scale.text())
+
+		get_setting      = [str(self.channel_device.tab_get.input_server.text()),str(self.channel_device.tab_get.input_device.text()),str(self.channel_device.tab_get.input_setting.text())]
+		get_inputs       = [inp[0] for inp in self.channel_device.tab_get.inputs]
+		get_inputs_units = [inp[1] for inp in self.channel_device.tab_get.inputs]
+
+		set_setting       = [str(self.channel_device.tab_set.input_server.text()),str(self.channel_device.tab_set.input_device.text()),str(self.channel_device.tab_set.input_setting.text())]
+		set_var_slot      = str(self.channel_device.tab_set.input_var_slot.text())
+		set_var_units     = str(self.channel_device.tab_set.input_var_units.text())
+		set_statics       = [inp[0] for inp in self.channel_device.tab_set.inputs]
+		set_statics_units = [inp[1] for inp in self.channel_device.tab_set.inputs]
+
+		# Check that all values are valid (floats are floats, etc)
+		try:
+			ID = str(int(ID))
+		except:
+			print("Error: ID must be an integer\n")
+			return
+
+		try:
+			set_min    = float(set_min)
+			set_max    = float(set_max)
+			set_offset = float(set_offset)
+			set_scale  = float(set_scale)
+			if set_min >= set_max:
+				print("Error: minimum cannot exceed maximum.\n")
+				return
+			if set_scale == 0.0:
+				print("Error: scale cannot be zero.\n")
+				return
+		except:
+			print("Error: bounds settings (min,max,offset,scale) are invalid: at least one cannot be interpreted as a valid float.\n")
+			return
+
+		try:
+			set_var_slot = int(set_var_slot)
+			if set_var_slot > len(set_statics):
+				print("Error: var slot is too large (must be no larger than the number of set inputs)\n")
+				return
+		except:
+			print("Error: var slot must be an integer.\n")
+			return
+
+		if not (has_get or has_set):
+			print("Warning: has_get and has_set are both False. In its current state this channel will not be usable.")
+		
+		# Compare & make modifications if en editing mode
+		if self.mode == 'editing': # Can't edit name/ID, can edit everything else
+			modifications = []
+
+			if label       != self.channel.label      : modifications += [['label'      , label      ]]
+			if description != self.channel.description: modifications += [['description', description]]
+			if tags        != self.channel.tags       : modifications += [['tags'       , tags       ]]
+			if has_get     != self.channel.has_get    : modifications += [['has_get'    , has_get    ]]
+			if has_set     != self.channel.has_set    : modifications += [['has_set'    , has_set    ]]
+			if set_min     != self.channel.set_min    : modifications += [['set_min'    , set_min    ]]
+			if set_max     != self.channel.set_max    : modifications += [['set_max'    , set_max    ]]
+			if set_offset  != self.channel.set_offset : modifications += [['set_offset' , set_offset ]]
+			if set_scale   != self.channel.set_scale  : modifications += [['set_scale'  , set_scale  ]]
+
+			if get_setting      != self.channel.get_setting     : modifications += [['get_setting'     , get_setting     ]]
+			if get_inputs       != self.channel.get_inputs      : modifications += [['get_inputs'      , get_inputs      ]]
+			if get_inputs_units != self.channel.get_inputs_units: modifications += [['get_inputs_units', get_inputs_units]]
+
+			if set_setting       != self.channel.set_setting      : modifications += [['set_setting'      , set_setting      ]]
+			if set_var_slot      != self.channel.set_var_slot     : modifications += [['set_var_slot'     , set_var_slot     ]]
+			if set_var_units     != self.channel.set_var_units    : modifications += [['set_var_units'    , set_var_units    ]]
+			if set_statics       != self.channel.set_statics      : modifications += [['set_statics'      , set_statics      ]]
+			if set_statics_units != self.channel.set_statics_units: modifications += [['set_statics_units', set_statics_units]]
+
+			if len(modifications):
+				print("Modifications detected:\n{modifications}".format(modifications=modifications))
+				print("Attempting to apply modifications...")
+				success = self.vds.modify_channel_details(modifications,self.channel.ID)
+				print("completed\n")
+			else:
+				print("Error: did not find any changes.\n")
+				return
+
+			self.change_mode('viewing')
+			self.reload_channel()
+
+		elif self.mode == 'creating':
+			print("Attempting to create channel with ID {ID}, name {name}".format(ID=ID,name=name))
+			self.vds.reg_add_channel(ID,name,label,description,tags,has_get,has_set,get_setting,get_inputs,get_inputs_units,set_setting,set_var_slot,set_var_units,set_statics,set_statics_units,str(set_min),str(set_max),str(set_offset),str(set_scale))
+			print("completed\n")
+
+			self.change_mode('viewing')
+			self.channel_selector.populate()
+			self.load_channel(force_id=True,ID=ID)
 			self.controls.cb_confirm_discard.setChecked(False)
+			self.controls.cb_confirm_save.setChecked(False)
