@@ -257,6 +257,7 @@ class ChannelDescriptiveInfoWidget(gui.QWidget):
 class ChannelDeviceInfoWidget(gui.QWidget):
 	def __init__(self,parent):
 		super(ChannelDeviceInfoWidget,self).__init__(parent)
+		self.parent = parent
 
 		self.channel = None
 
@@ -346,13 +347,24 @@ class ChannelDeviceInfoWidget(gui.QWidget):
 class ChannelGetInfoWidget(gui.QWidget):
 	def __init__(self,parent):
 		super(ChannelGetInfoWidget,self).__init__(parent)
+		self.parent=parent
+		self.cxn = self.parent.parent.connection
 
 		self.label_server  = gui.QLineEdit("server",self) ; self.label_server.setReadOnly(True)
 		self.label_device  = gui.QLineEdit("device",self) ; self.label_device.setReadOnly(True)
 		self.label_setting = gui.QLineEdit("setting",self); self.label_setting.setReadOnly(True)
-		self.input_server  = gui.QLineEdit(self)
-		self.input_device  = gui.QLineEdit(self)
-		self.input_setting = gui.QLineEdit(self)
+		self.input_server  = gui.QLineEdit(self); self.cb_server  = gui.QComboBox(self)
+		self.input_device  = gui.QLineEdit(self); self.cb_device  = gui.QComboBox(self)
+		self.input_setting = gui.QLineEdit(self); self.cb_setting = gui.QComboBox(self)
+
+		self.cb_server.activated.connect(self.update_server)
+		self.cb_device.activated.connect(self.update_device)
+		self.cb_setting.activated.connect(self.update_setting)
+		self.input_setting.textEdited.connect(self.deselect_setting)
+		self.input_device.textEdited.connect(self.deselect_device)
+		self.input_server.textEdited.connect(self.deselect_server)
+
+		self.populate_dropdowns()
 
 		self.inputs = [] # list of [ [value, units], ... ]
 		self.label_inputs     = gui.QLineEdit("inputs",self); self.label_inputs.setReadOnly(True)
@@ -366,10 +378,12 @@ class ChannelGetInfoWidget(gui.QWidget):
 
 		self.VBoxLabels = gui.QVBoxLayout(); self.VBoxLabels.setSpacing(0)
 		self.VBoxInputs = gui.QVBoxLayout(); self.VBoxInputs.setSpacing(0)
+		self.VBoxDrops  = gui.QVBoxLayout(); self.VBoxDrops.setSpacing(0)
 		self.HBoxTop    = gui.QHBoxLayout(); self.HBoxTop.setSpacing(0)
 		self.VBoxLabels.addWidget(self.label_server);self.VBoxLabels.addWidget(self.label_device);self.VBoxLabels.addWidget(self.label_setting)
 		self.VBoxInputs.addWidget(self.input_server);self.VBoxInputs.addWidget(self.input_device);self.VBoxInputs.addWidget(self.input_setting)
-		self.HBoxTop.addLayout(self.VBoxLabels,1);self.HBoxTop.addLayout(self.VBoxInputs,4)
+		self.VBoxDrops.addWidget(self.cb_server);self.VBoxDrops.addWidget(self.cb_device);self.VBoxDrops.addWidget(self.cb_setting)
+		self.HBoxTop.addLayout(self.VBoxLabels,2);self.HBoxTop.addLayout(self.VBoxInputs,5);self.HBoxTop.addLayout(self.VBoxDrops,3)
 
 		self.HBoxInputsListTop = gui.QHBoxLayout(); self.HBoxInputsListTop.setSpacing(0)
 		self.HBoxInptusListBot = gui.QHBoxLayout(); self.HBoxInptusListBot.setSpacing(0)
@@ -390,6 +404,37 @@ class ChannelGetInfoWidget(gui.QWidget):
 		self.input_units.returnPressed.connect(self.add_input)
 		self.button_del_input.clicked.connect(self.del_input)
 		self.button_clear_inputs.clicked.connect(self.clear_inputs)
+
+	def update_server(self):
+		self.input_server.setText(self.cb_server.currentText())
+		self.cb_device.clear()
+		for device in self.devices[str(self.cb_server.currentText())]: self.cb_device.addItem(device)
+		self.cb_device.setCurrentIndex(-1)
+		
+		self.cb_setting.clear()
+		for setting in self.settings[str(self.cb_server.currentText())]:self.cb_setting.addItem(setting)
+		self.cb_setting.setCurrentIndex(-1)
+
+	def update_device(self):
+		self.input_device.setText(self.cb_device.currentText())
+	def update_setting(self):
+		self.input_setting.setText(self.cb_setting.currentText())
+
+	def deselect_server(self):
+		self.cb_server.setCurrentIndex(-1)
+	def deselect_device(self):
+		self.cb_device.setCurrentIndex(-1)
+	def deselect_setting(self):
+		self.cb_setting.setCurrentIndex(-1)
+
+	def populate_dropdowns(self):
+		self.servers  = [s for s in self.cxn.servers if 'list_devices' in self.cxn.servers[s].settings]
+		self.devices  = {s:[t[1] for t in self.cxn.servers[s].list_devices()] for s in self.servers}
+		self.settings = {s:[t for t in self.cxn.servers[s].settings] for s in self.servers}
+
+		self.cb_server.clear(); self.cb_server.addItems(self.servers); self.cb_server.setCurrentIndex(-1)
+
+
 
 	def add_input(self):
 		value = str(self.input_value.text())
@@ -419,6 +464,9 @@ class ChannelGetInfoWidget(gui.QWidget):
 		self.input_server.setReadOnly(mode == 'viewing')
 		self.input_device.setReadOnly(mode == 'viewing')
 		self.input_setting.setReadOnly(mode == 'viewing')
+		self.cb_server.setEnabled(mode!='viewing')
+		self.cb_device.setEnabled(mode!='viewing')
+		self.cb_setting.setEnabled(mode!='viewing')
 		self.input_value.setReadOnly(mode == 'viewing')
 		self.input_units.setReadOnly(mode == 'viewing')
 		self.button_add_input.setEnabled(mode != 'viewing')
@@ -450,12 +498,25 @@ class ChannelGetInfoWidget(gui.QWidget):
 class ChannelSetInfoWidget(gui.QWidget):
 	def __init__(self,parent):
 		super(ChannelSetInfoWidget,self).__init__(parent)
+		self.parent=parent
+		self.cxn = self.parent.parent.connection
+
 		self.label_server  = gui.QLineEdit("server",self) ; self.label_server.setReadOnly(True)
 		self.label_device  = gui.QLineEdit("device",self) ; self.label_device.setReadOnly(True)
 		self.label_setting = gui.QLineEdit("setting",self); self.label_setting.setReadOnly(True)
-		self.input_server  = gui.QLineEdit(self)
-		self.input_device  = gui.QLineEdit(self)
-		self.input_setting = gui.QLineEdit(self)
+		self.input_server  = gui.QLineEdit(self); self.cb_server  = gui.QComboBox(self)
+		self.input_device  = gui.QLineEdit(self); self.cb_device  = gui.QComboBox(self)
+		self.input_setting = gui.QLineEdit(self); self.cb_setting = gui.QComboBox(self)
+
+		self.cb_server.activated.connect(self.update_server)
+		self.cb_device.activated.connect(self.update_device)
+		self.cb_setting.activated.connect(self.update_setting)
+		self.input_setting.textEdited.connect(self.deselect_setting)
+		self.input_device.textEdited.connect(self.deselect_device)
+		self.input_server.textEdited.connect(self.deselect_server)
+
+		self.populate_dropdowns()
+
 
 		self.label_var_slot  = gui.QLineEdit("variable slot",self) ; self.label_var_slot.setReadOnly(True)
 		self.label_var_units = gui.QLineEdit("variable units",self); self.label_var_units.setReadOnly(True)
@@ -474,10 +535,12 @@ class ChannelSetInfoWidget(gui.QWidget):
 
 		self.VBoxLabels = gui.QVBoxLayout(); self.VBoxLabels.setSpacing(0)
 		self.VBoxInputs = gui.QVBoxLayout(); self.VBoxInputs.setSpacing(0)
+		self.VBoxDrops  = gui.QVBoxLayout(); self.VBoxDrops.setSpacing(0)
 		self.HBoxTop    = gui.QHBoxLayout(); self.HBoxTop.setSpacing(0)
+		self.VBoxDrops.addWidget(self.cb_server);self.VBoxDrops.addWidget(self.cb_device);self.VBoxDrops.addWidget(self.cb_setting)
 		self.VBoxLabels.addWidget(self.label_server);self.VBoxLabels.addWidget(self.label_device);self.VBoxLabels.addWidget(self.label_setting)
 		self.VBoxInputs.addWidget(self.input_server);self.VBoxInputs.addWidget(self.input_device);self.VBoxInputs.addWidget(self.input_setting)
-		self.HBoxTop.addLayout(self.VBoxLabels,1);self.HBoxTop.addLayout(self.VBoxInputs,4)
+		self.HBoxTop.addLayout(self.VBoxLabels,2);self.HBoxTop.addLayout(self.VBoxInputs,4);self.HBoxTop.addLayout(self.VBoxDrops,3)
 
 		self.VBoxVarLabels = gui.QVBoxLayout();self.VBoxVarLabels.setSpacing(0)
 		self.VBoxVarInputs = gui.QVBoxLayout();self.VBoxVarInputs.setSpacing(0)
@@ -508,6 +571,35 @@ class ChannelSetInfoWidget(gui.QWidget):
 		self.button_del_input.clicked.connect(self.del_input)
 		self.button_clear_inputs.clicked.connect(self.clear_inputs)
 
+	def update_server(self):
+		self.input_server.setText(self.cb_server.currentText())
+		self.cb_device.clear()
+		for device in self.devices[str(self.cb_server.currentText())]: self.cb_device.addItem(device)
+		self.cb_device.setCurrentIndex(-1)
+		
+		self.cb_setting.clear()
+		for setting in self.settings[str(self.cb_server.currentText())]:self.cb_setting.addItem(setting)
+		self.cb_setting.setCurrentIndex(-1)
+
+	def update_device(self):
+		self.input_device.setText(self.cb_device.currentText())
+	def update_setting(self):
+		self.input_setting.setText(self.cb_setting.currentText())
+
+	def deselect_server(self):
+		self.cb_server.setCurrentIndex(-1)
+	def deselect_device(self):
+		self.cb_device.setCurrentIndex(-1)
+	def deselect_setting(self):
+		self.cb_setting.setCurrentIndex(-1)
+
+	def populate_dropdowns(self):
+		self.servers  = [s for s in self.cxn.servers if 'list_devices' in self.cxn.servers[s].settings]
+		self.devices  = {s:[t[1] for t in self.cxn.servers[s].list_devices()] for s in self.servers}
+		self.settings = {s:[t for t in self.cxn.servers[s].settings] for s in self.servers}
+
+		self.cb_server.clear(); self.cb_server.addItems(self.servers); self.cb_server.setCurrentIndex(-1)
+
 	def add_input(self):
 		value = str(self.input_value.text())
 		units = str(self.input_units.text())
@@ -536,6 +628,9 @@ class ChannelSetInfoWidget(gui.QWidget):
 		self.input_server.setReadOnly(mode == 'viewing')
 		self.input_device.setReadOnly(mode == 'viewing')
 		self.input_setting.setReadOnly(mode == 'viewing')
+		self.cb_server.setEnabled(mode!='viewing')
+		self.cb_device.setEnabled(mode!='viewing')
+		self.cb_setting.setEnabled(mode!='viewing')
 		self.input_value.setReadOnly(mode == 'viewing')
 		self.input_units.setReadOnly(mode == 'viewing')
 		self.input_var_slot.setReadOnly(mode == 'viewing')
